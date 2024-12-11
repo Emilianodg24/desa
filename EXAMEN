@@ -1,0 +1,160 @@
+import pygame
+import sys
+from pygame.locals import *
+from PIL import Image, ImageSequence
+import time
+
+# Inicializar Pygame
+pygame.init()
+
+# Configuración de la pantalla
+ANCHO = 800
+ALTO = 600
+screen = pygame.display.set_mode((ANCHO, ALTO))
+pygame.display.set_caption("Juego estilo Mario Bros")
+
+# Colores
+BLANCO = (255, 255, 255)
+NEGRO = (0, 0, 0)
+
+# Frames por segundo
+FPS = 60
+clock = pygame.time.Clock()
+
+# Clase del jugador
+class Jugador(pygame.sprite.Sprite):
+    def __init__(self, x, y, imagen_path):
+        super().__init__()
+        self.image = pygame.image.load(imagen_path).convert_alpha()
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
+        self.vel_y = 0
+        self.salto = -15
+        self.gravedad = 1
+        self.vel_x = 5
+
+    def update(self, plataformas, keys):
+        # Movimiento lateral
+        if keys[pygame.K_a]:  # Moverse a la izquierda
+            self.rect.x -= self.vel_x
+        if keys[pygame.K_d]:  # Moverse a la derecha
+            self.rect.x += self.vel_x
+
+        # Aplicar gravedad
+        self.vel_y += self.gravedad
+        self.rect.y += self.vel_y
+
+        # Colisión con plataformas
+        for plataforma in plataformas:
+            if self.rect.colliderect(plataforma.rect) and self.vel_y > 0:
+                self.rect.bottom = plataforma.rect.top
+                self.vel_y = 0
+
+    def saltar(self):
+        self.vel_y = self.salto
+
+# Clase de plataforma
+class Plataforma(pygame.sprite.Sprite):
+    def __init__(self, x, y, imagen_path):
+        super().__init__()
+        self.image = pygame.image.load(imagen_path).convert_alpha()
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (x, y)
+
+# Cargar fondo desde un GIF animado
+fondo_frames = []
+try:
+    gif = Image.open("Gif De Paisajes.gif")  # Reemplaza con la ruta de tu archivo GIF
+    for frame in ImageSequence.Iterator(gif):
+        frame = frame.convert("RGBA")
+        pygame_image = pygame.image.fromstring(frame.tobytes(), frame.size, frame.mode)
+        fondo_frames.append(pygame.transform.scale(pygame_image, (ANCHO, ALTO)))
+except FileNotFoundError:
+    print("No se encontró el archivo fondo.gif")
+    sys.exit()
+
+fondo_actual = 0
+
+# Cargar personaje y plataformas
+personaje_path = "fFHsDB-removebg-preview.png"  # Reemplaza con la ruta de tu imagen de personaje
+plataforma_path = "plataforma.jpg"  # Reemplaza con la ruta de tu imagen de plataforma
+
+jugador = Jugador(100, 400, personaje_path)
+
+plataformas = pygame.sprite.Group()
+plataformas.add(Plataforma(50, 500, plataforma_path))
+plataformas.add(Plataforma(300, 400, plataforma_path))
+plataformas.add(Plataforma(500, 300, plataforma_path))
+
+jugador_sprite = pygame.sprite.GroupSingle(jugador)
+
+# Variables de juego
+puntaje = 0
+font = pygame.font.SysFont(None, 36)
+
+# Menú principal
+def mostrar_menu():
+    screen.fill(NEGRO)
+    font_titulo = pygame.font.SysFont(None, 72)
+    texto_titulo = font_titulo.render("Juego estilo Mario Bros", True, BLANCO)
+    texto_instrucciones = font.render("Presiona ENTER para comenzar", True, BLANCO)
+    screen.blit(texto_titulo, (ANCHO // 2 - texto_titulo.get_width() // 2, ALTO // 3))
+    screen.blit(texto_instrucciones, (ANCHO // 2 - texto_instrucciones.get_width() // 2, ALTO // 2))
+    pygame.display.flip()
+
+mostrar_menu()
+menu = True
+while menu:
+    for evento in pygame.event.get():
+        if evento.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_RETURN:
+                menu = False
+
+# Bucle principal
+ejecutando = True
+while ejecutando:
+    keys = pygame.key.get_pressed()
+
+    for evento in pygame.event.get():
+        if evento.type == pygame.QUIT:
+            ejecutando = False
+
+        if evento.type == pygame.KEYDOWN:
+            if evento.key == pygame.K_w:  # Saltar con "W"
+                jugador.saltar()
+
+    # Actualizar jugador
+    jugador.update(plataformas, keys)
+
+    # Verificar si el jugador pisa una plataforma y eliminarla
+    plataformas_a_eliminar = []
+    for plataforma in plataformas:
+        if jugador.rect.colliderect(plataforma.rect):
+            plataformas_a_eliminar.append(plataforma)
+            puntaje += 10
+
+    for plataforma in plataformas_a_eliminar:
+        plataformas.remove(plataforma)
+
+    # Alternar fondo animado
+    fondo_actual = (fondo_actual + 1) % len(fondo_frames)
+
+    # Dibujar todo
+    screen.blit(fondo_frames[fondo_actual], (0, 0))
+    plataformas.draw(screen)
+    jugador_sprite.draw(screen)
+
+    # Mostrar puntaje
+    texto_puntaje = font.render(f"Puntaje: {puntaje}", True, BLANCO)
+    screen.blit(texto_puntaje, (10, 10))
+
+    # Actualizar pantalla
+    pygame.display.flip()
+
+    # Controlar FPS
+    clock.tick(FPS)
+
+pygame.quit()
